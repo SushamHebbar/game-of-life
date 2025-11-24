@@ -1,5 +1,9 @@
 package com.example.gameoflife;
 
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.Timer;
+
 public class GameOfLife {
 
     private static final int[][] DIRS = new int[][] {
@@ -13,6 +17,8 @@ public class GameOfLife {
             {1, -1}      // bottom left
     };
 
+    private final List<GameObserver> observers = new ArrayList<>();
+
     private boolean[][] universe;
     private final int rows;
     private final int cols;
@@ -21,6 +27,20 @@ public class GameOfLife {
         this.rows = rows;
         this.cols = cols;
         this.universe = new boolean[rows][cols];
+    }
+
+    public void addObserver(GameObserver observer) {
+        observers.add(observer);
+    }
+
+    public void removeObserver(GameObserver observer) {
+        observers.remove(observer);
+    }
+
+    private void notifyObservers(int generation) {
+        for (GameObserver observer : observers) {
+            observer.onUniverseUpdated(universe, generation);
+        }
     }
 
     public void initializeGlider() {
@@ -32,11 +52,22 @@ public class GameOfLife {
         updateCell(row + 1, col - 1, true);
         updateCell(row + 1, col, true);
         updateCell(row + 1, col + 1, true);
+
+        for(GameObserver observer : observers) {
+            observer.onUniverseUpdated(universe, 0);
+        }
     }
 
     public void start(int generations) {
-        for(int gen = 1; gen <= generations; gen++) {
-            printUniverse(gen);
+        for (GameObserver observer : observers) {
+            observer.onGameStarted();
+        }
+
+        final int[] gen = {1};
+        Timer timer = new Timer(300, null);
+        timer.addActionListener(e -> {
+            notifyObservers(gen[0]);
+//            printUniverse(gen[0]);
 
             boolean[][] newUniverse = new boolean[rows][cols];
             for(int i = 0; i < rows; i++) {
@@ -56,7 +87,16 @@ public class GameOfLife {
             }
 
             universe = newUniverse;
-        }
+            gen[0]++;
+            if(gen[0] > generations) {
+                timer.stop();
+
+                for(GameObserver observer : observers) {
+                    observer.onGameEnded();
+                }
+            }
+        });
+        timer.start();
     }
 
     private boolean isValidCell(int row, int col) {
